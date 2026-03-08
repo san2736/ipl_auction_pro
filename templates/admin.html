@@ -1,0 +1,21 @@
+<h1>Auction Control</h1>
+
+{% for p in players %}
+
+<div>
+
+{{p[1]}}
+
+<a href="/start_auction/{{p[0]}}">
+
+<button>
+
+Start Auction
+
+</button>
+
+</a>
+
+</div>
+
+{% endfor %}
