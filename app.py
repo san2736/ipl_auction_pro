@@ -1,28 +1,20 @@
 import os
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, request
+from flask_socketio import SocketIO, emit
 import psycopg2
-from psycopg2 import pool
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
+socketio = SocketIO(app)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-connection_pool = psycopg2.pool.SimpleConnectionPool(
-    1,
-    10,
-    DATABASE_URL
-)
-
 def get_conn():
-    return connection_pool.getconn()
-
-def release_conn(conn):
-    connection_pool.putconn(conn)
+    return psycopg2.connect(DATABASE_URL)
 
 
 @app.route("/")
-def players():
+def index():
 
     conn = get_conn()
     cur = conn.cursor()
@@ -35,37 +27,31 @@ def players():
 
     players = cur.fetchall()
 
-    release_conn(conn)
+    cur.execute("SELECT name,purse FROM teams")
+    teams = cur.fetchall()
 
-    return render_template("players.html", players=players)
+    conn.close()
+
+    return render_template("auction.html",players=players,teams=teams)
 
 
-@app.route("/start_auction/<int:player_id>")
-def start_auction(player_id):
+
+@socketio.on("place_bid")
+def place_bid(data):
+
+    player_id = data["player_id"]
+    team = data["team"]
+    bid = data["bid"]
 
     conn = get_conn()
     cur = conn.cursor()
-
-    end_time = datetime.utcnow() + timedelta(seconds=30)
 
     cur.execute("""
-    UPDATE players
-    SET auction_end=%s
-    WHERE id=%s
-    """,(end_time,player_id))
+    INSERT INTO bids(player_id,team,bid_amount)
+    VALUES(%s,%s,%s)
+    """,(player_id,team,bid))
 
     conn.commit()
-
-    release_conn(conn)
-
-    return "Auction Started"
-
-
-@app.route("/bid_history/<int:player_id>")
-def bid_history(player_id):
-
-    conn = get_conn()
-    cur = conn.cursor()
 
     cur.execute("""
     SELECT team,bid_amount
@@ -77,29 +63,22 @@ def bid_history(player_id):
 
     bids = cur.fetchall()
 
-    release_conn(conn)
+    conn.close()
 
-    return jsonify({"bids":bids})
+    emit("bid_update",{"bids":bids,"bid":bid,"team":team},broadcast=True)
 
 
-@app.route("/teams")
-def teams():
 
-    conn = get_conn()
-    cur = conn.cursor()
+@socketio.on("start_timer")
+def start_timer(data):
 
-    cur.execute("""
-    SELECT name,purse
-    FROM teams
-    ORDER BY purse DESC
-    """)
+    duration = data["seconds"]
 
-    teams = cur.fetchall()
+    end_time = datetime.utcnow() + timedelta(seconds=duration)
 
-    release_conn(conn)
+    emit("timer_started",{"end":end_time.timestamp()},broadcast=True)
 
-    return jsonify({"teams":teams})
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    socketio.run(app,host="0.0.0.0",port=5000)
