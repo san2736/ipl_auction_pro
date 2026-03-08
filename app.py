@@ -1,168 +1,105 @@
-from flask import Flask, render_template, request
-import psycopg2
 import os
-import time
-from flask_socketio import SocketIO, emit
+from flask import Flask, render_template, jsonify
+import psycopg2
+from psycopg2 import pool
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
-socketio = SocketIO(app)
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-conn = psycopg2.connect(DATABASE_URL)
-cur = conn.cursor()
+connection_pool = psycopg2.pool.SimpleConnectionPool(
+    1,
+    10,
+    DATABASE_URL
+)
 
-auction_timer = {}
+def get_conn():
+    return connection_pool.getconn()
+
+def release_conn(conn):
+    connection_pool.putconn(conn)
 
 
 @app.route("/")
-def home():
+def players():
 
-    cur.execute("SELECT * FROM players")
-    players = cur.fetchall()
-
-    return render_template("index.html",players=players)
-
-
-@app.route("/player/<id>")
-def player(id):
-
-    cur.execute("SELECT * FROM players WHERE id=%s",[id])
-    player = cur.fetchone()
+    conn = get_conn()
+    cur = conn.cursor()
 
     cur.execute("""
-    SELECT MAX(bid_amount)
-    FROM bids
-    WHERE player_id=%s
-    """,[id])
+    SELECT id,name,role,base_price,image
+    FROM players
+    ORDER BY name
+    """)
 
-    highest = cur.fetchone()[0]
-
-    if highest is None:
-        highest = player[4]
-
-    return render_template("player.html",
-                           player=player,
-                           highest=highest)
-
-
-@app.route("/admin")
-def admin():
-
-    cur.execute("SELECT * FROM players")
     players = cur.fetchall()
 
-    return render_template("admin.html",players=players)
+    release_conn(conn)
+
+    return render_template("players.html", players=players)
 
 
-@app.route("/start_auction/<player_id>")
+@app.route("/start_auction/<int:player_id>")
 def start_auction(player_id):
 
-    auction_timer[player_id] = time.time() + 30
+    conn = get_conn()
+    cur = conn.cursor()
 
-    socketio.emit("auction_started",{
-        "player_id":player_id,
-        "time":30
-    })
+    end_time = datetime.utcnow() + timedelta(seconds=30)
+
+    cur.execute("""
+    UPDATE players
+    SET auction_end=%s
+    WHERE id=%s
+    """,(end_time,player_id))
+
+    conn.commit()
+
+    release_conn(conn)
 
     return "Auction Started"
 
 
-@socketio.on("place_bid")
-def place_bid(data):
+@app.route("/bid_history/<int:player_id>")
+def bid_history(player_id):
 
-    player_id = data["player_id"]
-    bid = int(data["bid"])
-    bidder = data["bidder"]
+    conn = get_conn()
+    cur = conn.cursor()
 
     cur.execute("""
-    SELECT MAX(bid_amount)
+    SELECT team,bid_amount
     FROM bids
     WHERE player_id=%s
-    """,[player_id])
+    ORDER BY bid_amount DESC
+    LIMIT 10
+    """,(player_id,))
 
-    highest = cur.fetchone()[0]
+    bids = cur.fetchall()
 
-    if highest and bid <= highest:
+    release_conn(conn)
 
-        emit("bid_error",{"msg":"Bid must be higher"})
-        return
+    return jsonify({"bids":bids})
+
+
+@app.route("/teams")
+def teams():
+
+    conn = get_conn()
+    cur = conn.cursor()
 
     cur.execute("""
-    INSERT INTO bids(player_id,bid_amount,bidder)
-    VALUES(%s,%s,%s)
-    """,[player_id,bid,bidder])
+    SELECT name,purse
+    FROM teams
+    ORDER BY purse DESC
+    """)
 
-    conn.commit()
+    teams = cur.fetchall()
 
-    socketio.emit("new_bid",{
-        "player_id":player_id,
-        "bid":bid,
-        "bidder":bidder
-    })
+    release_conn(conn)
 
-
-def auction_countdown():
-
-    while True:
-
-        for player_id in list(auction_timer):
-
-            remaining = int(auction_timer[player_id] - time.time())
-
-            if remaining <= 0:
-
-                cur.execute("""
-                SELECT bidder,bid_amount
-                FROM bids
-                WHERE player_id=%s
-                ORDER BY bid_amount DESC
-                LIMIT 1
-                """,[player_id])
-
-                winner = cur.fetchone()
-
-                if winner:
-
-                    bidder = winner[0]
-                    price = winner[1]
-
-                    cur.execute("""
-                    UPDATE players
-                    SET sold=TRUE,
-                    sold_price=%s,
-                    sold_to=%s
-                    WHERE id=%s
-                    """,[price,bidder,player_id])
-
-                    cur.execute("""
-                    UPDATE teams
-                    SET purse = purse - %s
-                    WHERE name=%s
-                    """,[price,bidder])
-
-                    conn.commit()
-
-                    socketio.emit("player_sold",{
-                        "player_id":player_id,
-                        "team":bidder,
-                        "price":price
-                    })
-
-                del auction_timer[player_id]
-
-            else:
-
-                socketio.emit("timer_update",{
-                    "player_id":player_id,
-                    "time":remaining
-                })
-
-        socketio.sleep(1)
-
-
-socketio.start_background_task(auction_countdown)
+    return jsonify({"teams":teams})
 
 
 if __name__ == "__main__":
-    socketio.run(app)
+    app.run(debug=True)
