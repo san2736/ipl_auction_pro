@@ -4,58 +4,109 @@
 <head>
 
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="/static/script.js"></script>
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 
 </head>
 
-<body class="bg-gray-100">
+<body class="bg-[#121212] text-white">
 
-<div class="p-10">
+<div class="grid grid-cols-2 gap-10 p-10">
 
-<h1 class="text-4xl font-bold">{{player[1]}}</h1>
+<div>
 
-<p>{{player[2]}} | {{player[3]}}</p>
+<img src="{{player[5]}}" class="rounded-xl">
 
-<img src="{{player[5]}}" class="w-64 mt-4">
+<h1 class="text-4xl mt-4">
 
-<h2 class="text-2xl mt-4">
+{{player[1]}}
 
-Highest Bid:
-<span id="highestBid">
-₹{{highest}}
-</span>
+</h1>
+
+<p>{{player[2]}} • {{player[3]}}</p>
+
+</div>
+
+<div class="bg-[#1f1f1f] p-6 rounded">
+
+<h2 class="text-2xl">
+
+Current Bid
 
 </h2>
 
-<form action="/bid/{{player[0]}}" method="POST" class="mt-4">
+<div id="highestBid"
+class="text-5xl text-yellow-400">
 
-<input name="bid"
-class="border p-2">
+₹{{highest}}
 
-<button class="bg-green-500 text-white px-4 py-2">
+</div>
+
+<div class="mt-4">
+
+Timer:
+<span id="timer" class="text-red-500 text-3xl">
+
+30
+
+</span>
+
+</div>
+
+<input id="bidInput"
+class="p-3 text-black mt-4 w-full">
+
+<button onclick="placeBid()"
+class="bg-blue-600 p-3 mt-4 w-full">
 
 Place Bid
 
 </button>
 
-</form>
+</div>
 
 </div>
 
 <script>
 
-setInterval(function(){
+const socket = io()
 
-fetch("/highest_bid/{{player[0]}}")
-.then(res=>res.json())
-.then(data=>{
-document.getElementById("highestBid").innerText="₹"+data.bid
+function placeBid(){
+
+let bid = document.getElementById("bidInput").value
+
+socket.emit("place_bid",{
+
+player_id: {{player[0]}},
+bid: bid,
+bidder: "CSK"
+
 })
 
-},2000)
+}
+
+socket.on("new_bid",function(data){
+
+if(data.player_id == {{player[0]}}){
+
+document.getElementById("highestBid").innerText =
+"₹"+data.bid
+
+}
+
+})
+
+socket.on("timer_update",function(data){
+
+if(data.player_id == {{player[0]}}){
+
+document.getElementById("timer").innerText =
+data.time
+
+}
+
+})
 
 </script>
 
 </body>
-
 </html>
