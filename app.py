@@ -5,14 +5,9 @@ import os
 app = Flask(__name__)
 app.secret_key = "secret123"
 
-conn = psycopg2.connect(
-    database="playersauc",
-    user="postgres",
-    password="password",
-    host="localhost",
-    port="5432"
-)
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
+conn = psycopg2.connect(DATABASE_URL)
 cur = conn.cursor()
 
 
