@@ -1,59 +1,71 @@
 <!DOCTYPE html>
 <html>
+
 <head>
 
 <title>IPL Auction</title>
 
-<link rel="stylesheet"
-href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-
-<link rel="stylesheet" href="/static/css/style.css">
+<script src="https://cdn.tailwindcss.com"></script>
 
 </head>
 
-<body>
+<body class="bg-gray-100">
 
-<div class="container">
+<div class="bg-indigo-900 text-white p-6 text-center text-3xl font-bold">
 
-<h1 class="title">IPL Auction Marketplace</h1>
+IPL Auction Marketplace
 
-<input class="form-control search" placeholder="Search players">
+</div>
 
-<div class="row">
+<div class="p-6">
+
+<form method="GET">
+
+<input name="search" placeholder="Search players"
+class="p-2 border w-1/3">
+
+<select name="role" class="p-2 border">
+<option value="">All Roles</option>
+<option>Batsman</option>
+<option>Bowler</option>
+<option>All-rounder</option>
+</select>
+
+<button class="bg-blue-500 text-white px-4 py-2">
+Search
+</button>
+
+</form>
+
+</div>
+
+<div class="grid grid-cols-4 gap-6 p-6">
 
 {% for p in players %}
 
-<div class="col-md-3">
+<a href="/player/{{p[0]}}">
 
-<div class="card player-card">
+<div class="bg-white shadow-lg rounded-xl p-4 hover:scale-105 transition">
 
-<div class="card-body">
+<img src="{{p[5]}}" class="h-40 w-full object-cover">
 
-<h4>{{p[1]}}</h4>
+<h2 class="text-xl font-bold mt-2">{{p[1]}}</h2>
 
 <p>{{p[2]}}</p>
-
 <p>{{p[3]}}</p>
 
-<p>Base: ₹{{p[4]}}</p>
+<p class="text-green-600">
+Base ₹{{p[4]}}
+</p>
 
-<p class="bid">Highest: ₹{{p[5]}}</p>
+</div>
 
-<a href="/player/{{p[0]}}" class="btn btn-primary">
-Bid Now
 </a>
-
-</div>
-
-</div>
-
-</div>
 
 {% endfor %}
 
 </div>
 
-</div>
-
 </body>
+
 </html>
