@@ -1,110 +1,150 @@
 <!DOCTYPE html>
 <html>
-
 <head>
 
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+<title>Auction</title>
+
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 
 </head>
 
-<body class="bg-[#121212] text-white">
+<body class="bg-gray-100 p-10">
 
-<div class="grid grid-cols-2 gap-10 p-10">
-
-<div>
-
-<img src="{{player[5]}}" class="rounded-xl">
-
-<h1 class="text-4xl mt-4">
-
-{{player[1]}}
-
+<h1 class="text-4xl font-bold mb-8">
+IPL Auction Dashboard
 </h1>
 
-<p>{{player[2]}} • {{player[3]}}</p>
 
-</div>
+<div id="teams" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10"></div>
 
-<div class="bg-[#1f1f1f] p-6 rounded">
 
-<h2 class="text-2xl">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-Current Bid
+{% for player in players %}
 
+<div class="bg-white rounded-xl shadow-lg p-5">
+
+<img
+src="/static/players/{{player[4]}}"
+class="w-full h-48 object-cover rounded"
+>
+
+<h2 class="text-xl font-bold mt-3">
+{{player[1]}}
 </h2>
 
-<div id="highestBid"
-class="text-5xl text-yellow-400">
+<p class="text-gray-500">
+Role: {{player[2]}}
+</p>
 
-₹{{highest}}
+<p class="text-green-600 font-semibold">
+Base Price ₹{{player[3]}}
+</p>
 
-</div>
+<button
+onclick="startAuction({{player[0]}})"
+class="bg-blue-600 text-white px-4 py-2 rounded mt-3">
 
-<div class="mt-4">
+Start Auction
 
-Timer:
-<span id="timer" class="text-red-500 text-3xl">
+</button>
 
-30
+<button
+onclick="loadBidHistory({{player[0]}})"
+class="bg-gray-700 text-white px-4 py-2 rounded mt-2">
 
-</span>
-
-</div>
-
-<input id="bidInput"
-class="p-3 text-black mt-4 w-full">
-
-<button onclick="placeBid()"
-class="bg-blue-600 p-3 mt-4 w-full">
-
-Place Bid
+View Bids
 
 </button>
 
 </div>
 
+{% endfor %}
+
 </div>
+
+
+<div class="mt-10">
+
+<h2 class="text-2xl font-bold mb-4">
+Bid History
+</h2>
+
+<ul id="bidHistory" class="bg-white p-4 rounded shadow">
+
+</ul>
+
+</div>
+
 
 <script>
 
-const socket = io()
+function startAuction(player_id){
 
-function placeBid(){
+fetch(`/start_auction/${player_id}`)
+.then(res=>res.text())
+.then(data=>{
+alert("Auction started")
+})
 
-let bid = document.getElementById("bidInput").value
+}
 
-socket.emit("place_bid",{
 
-player_id: {{player[0]}},
-bid: bid,
-bidder: "CSK"
+
+function loadBidHistory(player_id){
+
+fetch(`/bid_history/${player_id}`)
+.then(res=>res.json())
+.then(data=>{
+
+let list = document.getElementById("bidHistory")
+list.innerHTML=""
+
+data.bids.forEach(bid=>{
+
+let li = document.createElement("li")
+
+li.innerText = bid[0] + " bid ₹" + bid[1]
+
+list.appendChild(li)
+
+})
 
 })
 
 }
 
-socket.on("new_bid",function(data){
 
-if(data.player_id == {{player[0]}}){
 
-document.getElementById("highestBid").innerText =
-"₹"+data.bid
+function loadTeams(){
 
-}
+fetch("/teams")
+.then(res=>res.json())
+.then(data=>{
+
+let div = document.getElementById("teams")
+div.innerHTML=""
+
+data.teams.forEach(team=>{
+
+let card = document.createElement("div")
+
+card.className="bg-yellow-100 p-4 rounded shadow"
+
+card.innerHTML = `
+<h3 class="font-bold">${team[0]}</h3>
+<p>₹${team[1]} Cr remaining</p>
+`
+
+div.appendChild(card)
 
 })
 
-socket.on("timer_update",function(data){
-
-if(data.player_id == {{player[0]}}){
-
-document.getElementById("timer").innerText =
-data.time
+})
 
 }
 
-})
+loadTeams()
 
 </script>
 
