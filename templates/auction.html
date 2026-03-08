@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>IPL Auction Room</title>
+
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
+</head>
+
+<body class="bg-gray-100 p-10">
+
+<h1 class="text-4xl font-bold mb-8">
+Live Auction Room
+</h1>
+
+
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+
+{% for team in teams %}
+
+<div class="bg-yellow-200 p-4 rounded shadow">
+
+<h3 class="font-bold">{{team[0]}}</h3>
+
+<p>₹{{team[1]}} purse</p>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+
+<div id="timer" class="text-3xl font-bold text-red-600 mb-6">
+
+Timer: 0
+
+</div>
+
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+{% for player in players %}
+
+<div class="bg-white rounded-xl shadow-lg p-5">
+
+<img
+src="/static/players/{{player[4]}}"
+class="w-full h-48 object-cover rounded"
+>
+
+<h2 class="text-xl font-bold mt-3">
+{{player[1]}}
+</h2>
+
+<p class="text-gray-500">
+{{player[2]}}
+</p>
+
+<p class="text-green-600 font-semibold">
+Base ₹{{player[3]}}
+</p>
+
+<button
+onclick="startTimer()"
+class="bg-blue-600 text-white px-4 py-2 rounded mt-3">
+
+Start Auction
+
+</button>
+
+<input
+id="bid{{player[0]}}"
+placeholder="Enter Bid"
+class="border p-2 mt-2 w-full"
+/>
+
+<button
+onclick="placeBid({{player[0]}})"
+class="bg-green-600 text-white px-4 py-2 rounded mt-2">
+
+Place Bid
+
+</button>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+
+
+<div class="mt-10">
+
+<h2 class="text-2xl font-bold mb-4">
+
+Bid History
+
+</h2>
+
+<ul id="bids" class="bg-white p-4 rounded shadow">
+
+</ul>
+
+</div>
+
+
+<script>
+
+var socket = io()
+
+
+function placeBid(player_id){
+
+let bid = document.getElementById("bid"+player_id).value
+
+socket.emit("place_bid",{
+player_id:player_id,
+team:"Team",
+bid:bid
+})
+
+}
+
+
+
+socket.on("bid_update",function(data){
+
+let list = document.getElementById("bids")
+
+list.innerHTML=""
+
+data.bids.forEach(b=>{
+
+let li = document.createElement("li")
+
+li.innerText = b[0] + " bid ₹" + b[1]
+
+list.appendChild(li)
+
+})
+
+})
+
+
+
+function startTimer(){
+
+socket.emit("start_timer",{seconds:30})
+
+}
+
+
+
+socket.on("timer_started",function(data){
+
+let end = data.end
+
+let timer = document.getElementById("timer")
+
+let interval = setInterval(function(){
+
+let remaining = Math.floor(end - Date.now()/1000)
+
+timer.innerText = "Timer: "+remaining
+
+if(remaining <=0){
+
+clearInterval(interval)
+
+timer.innerText="SOLD"
+
+}
+
+},1000)
+
+})
+
+</script>
+
+
+</body>
+</html>
